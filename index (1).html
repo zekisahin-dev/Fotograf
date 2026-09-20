@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fotoğrafı Kim Aldı?</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #111827; color: #f9fafb; font-family: system-ui, sans-serif; }
+    main { max-width: 1100px; margin: auto; }
+    h1 { text-align: center; font-size: clamp(1.4rem, 4vw, 2.2rem); }
+    #status { text-align: center; color: #9ca3af; margin: 16px 0 24px; }
+    #gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+    .item { margin: 0; padding: 12px; border-radius: 12px; background: #1f2937; overflow: hidden; }
+    .item img, .item video { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; background: #000; }
+    .item figcaption { padding: 10px 2px 2px; color: #d1d5db; overflow-wrap: anywhere; }
+    .error { color: #fca5a5; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Fotoğrafı Kim Aldı?</h1>
+    <p id="status">Fotoğraf ve videolar yükleniyor...</p>
+    <section id="gallery" aria-live="polite"></section>
+  </main>
+  <script>
+    const owner = 'zekisahin-dev';
+    const repo = 'Fotograf';
+    const branch = 'main';
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/?ref=${branch}`;
+    const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/`;
+    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'];
+    const videoTypes = ['.mp4', '.webm', '.mov', '.m4v', '.ogv'];
+
+    function isMedia(name) {
+      const lower = name.toLowerCase();
+      return imageTypes.some(ext => lower.endsWith(ext)) || videoTypes.some(ext => lower.endsWith(ext));
+    }
+
+    function addMedia(file) {
+      const lower = file.name.toLowerCase();
+      const url = rawBase + file.name.split('/').map(encodeURIComponent).join('/');
+      const figure = document.createElement('figure');
+      figure.className = 'item';
+      let media;
+      if (imageTypes.some(ext => lower.endsWith(ext))) {
+        media = document.createElement('img');
+        media.loading = 'lazy';
+        media.alt = file.name;
+        media.src = url;
+      } else {
+        media = document.createElement('video');
+        media.controls = true;
+        media.preload = 'metadata';
+        media.playsInline = true;
+        media.src = url;
+      }
+      const caption = document.createElement('figcaption');
+      caption.textContent = file.name;
+      figure.append(media, caption);
+      document.getElementById('gallery').appendChild(figure);
+    }
+
+    async function loadGallery() {
+      try {
+        const response = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' } });
+        if (!response.ok) throw new Error(`GitHub API: ${response.status}`);
+        const files = await response.json();
+        const mediaFiles = files.filter(file => file.type === 'file' && isMedia(file.name));
+        mediaFiles.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+        mediaFiles.forEach(addMedia);
+        document.getElementById('status').textContent = mediaFiles.length
+          ? `${mediaFiles.length} medya dosyası gösteriliyor.`
+          : 'Henüz fotoğraf veya video bulunamadı.';
+      } catch (error) {
+        console.error(error);
+        document.getElementById('status').innerHTML = '<span class="error">Dosyalar yüklenemedi. Lütfen daha sonra tekrar deneyin.</span>';
+      }
+    }
+
+    loadGallery();
+  </script>
+</body>
+</html>
