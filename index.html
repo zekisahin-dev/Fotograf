@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fotoğrafı Kim Aldı?</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #111827;
+      color: #f9fafb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1100px, 100%);
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 8px 0 12px;
+      text-align: center;
+      font-size: clamp(1.5rem, 4vw, 2.3rem);
+    }
+
+    #status {
+      margin: 0 0 24px;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    #gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .item {
+      margin: 0;
+      padding: 12px;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #1f2937;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    }
+
+    .item img,
+    .item video {
+      display: block;
+      width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #000;
+    }
+
+    .item figcaption {
+      padding: 10px 2px 2px;
+      color: #d1d5db;
+      overflow-wrap: anywhere;
+    }
+
+    .hint {
+      margin: 28px 0 8px;
+      color: #9ca3af;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    .error {
+      color: #fca5a5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Fotoğrafı Kim Aldı?</h1>
+
+    <p id="status">Fotoğraf ve videolar yükleniyor...</p>
+
+    <section id="gallery" aria-live="polite"></section>
+
+    <p class="hint">Video eklendiğinde aynı QR kodu geçerli kalır.</p>
+  </main>
+
+  <script>
+    const owner = "zekisahin-dev";
+    const repo = "Fotograf";
+    const branch = "main";
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/?ref=${branch}`;
+    const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/`;
+
+    const imageTypes = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"];
+    const videoTypes = [".mp4", ".webm", ".mov", ".m4v", ".ogv"];
+
+    function hasExtension(name, extensions) {
+      const lowerName = name.toLowerCase();
+      return extensions.some(extension => lowerName.endsWith(extension));
+    }
+
+    function isMedia(name) {
+      return hasExtension(name, imageTypes) || hasExtension(name, videoTypes);
+    }
+
+    function makeFileUrl(name) {
+      return rawBase + name.split("/").map(encodeURIComponent).join("/");
+    }
+
+    function addMedia(file) {
+      const figure = document.createElement("figure");
+      figure.className = "item";
+
+      let media;
+      const url = makeFileUrl(file.name);
+
+      if (hasExtension(file.name, imageTypes)) {
+        media = document.createElement("img");
+        media.loading = "lazy";
+        media.alt = file.name;
+        media.src = url;
+      } else {
+        media = document.createElement("video");
+        media.controls = true;
+        media.preload = "metadata";
+        media.playsInline = true;
+        media.src = url;
+      }
+
+      const caption = document.createElement("figcaption");
+      caption.textContent = file.name;
+
+      figure.append(media, caption);
+      document.getElementById("gallery").appendChild(figure);
+    }
+
+    async function loadGallery() {
+      const status = document.getElementById("status");
+
+      try {
+        const response = await fetch(apiUrl, {
+          headers: { Accept: "application/vnd.github+json" }
+        });
+
+        if (!response.ok) {
+          throw new Error(`GitHub API error: ${response.status}`);
+        }
+
+        const files = await response.json();
+        const mediaFiles = files
+          .filter(file => file.type === "file" && isMedia(file.name))
+          .sort((a, b) => a.name.localeCompare(b.name, "tr"));
+
+        mediaFiles.forEach(addMedia);
+
+        status.textContent = mediaFiles.length
+          ? `${mediaFiles.length} medya dosyası gösteriliyor.`
+          : "Henüz fotoğraf veya video bulunamadı.";
+      } catch (error) {
+        console.error(error);
+        status.innerHTML = '<span class="error">Dosyalar yüklenemedi. Lütfen daha sonra tekrar deneyin.</span>';
+      }
+    }
+
+    loadGallery();
+  </script>
+</body>
+</html>
